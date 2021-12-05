@@ -55,7 +55,7 @@ MODE                g_eNextMode;
 
 Display_SSD1306_i2c g_iSSD1306;
 PMoni_INA226        g_iSupplyMon;
-i2c_mcp4725         g_iSupplyDac;
+i2c_mcp4726         g_iSupplyDac;
 int                 g_nSupplyDacOut = 0;
 PMoni_INA226        g_iLoadMon(1, 0);
 i2c_mcp4725         g_iLoadDac(1);
@@ -357,7 +357,7 @@ void ChangeMode( MODE mode)
         g_iLoadMon.SetSamplingPeriod(33);
         g_iSupplyMon.SetSamplingPeriod(33);
         g_eCurrentMode = MODE_LOAD_AUTO_INC;
-        Serial.println( "***** LAOD MODE, AUTO INCREMENT *****" );
+        Serial.println( "***** LOAD MODE, AUTO INCREMENT *****" );
         break;
       }
     /* Don't break */
@@ -366,7 +366,7 @@ void ChangeMode( MODE mode)
       g_iLoadMon.SetSamplingPeriod(100);
       g_iSupplyMon.SetSamplingPeriod(100);
       g_eCurrentMode = MODE_LOAD;
-      Serial.println( "***** LAOD MODE *****" );
+      Serial.println( "***** LOAD MODE *****" );
       break;
   }
 

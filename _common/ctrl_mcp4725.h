@@ -58,10 +58,10 @@ protected:
 };
 
 
-class i2c_mcp4726 : public ctrl_i2c
+class i2c_mcp4726
 {
 public:
-    i2c_mcp4726() : ctrl_i2c(0x60)
+    i2c_mcp4726() : m_i2c(0x60)
     {
     }
 
@@ -85,7 +85,7 @@ public:
         // Gain
         // 0: x1
         // 1: x2
-        reg |= 1 << 0;
+        reg |= 0 << 0;
 
         // 6.2 Write Volatile Memory
         // 0
@@ -97,6 +97,16 @@ public:
         // PD0
         // G
         uint8_t  w_data[3] = { reg, (uint8_t)(0xFF & (value >> 8)), (uint8_t)(0xFF & value) };
-        write(w_data, sizeof(w_data));
+        m_i2c.write(w_data, sizeof(w_data));
     }
+
+    uint16_t GetValue()
+    {
+        uint8_t  r_data[6] = { 0 };
+        m_i2c.read(r_data, sizeof(r_data));
+        return (r_data[1] << 8) | (0xF0 & r_data[2]);
+    }
+
+protected:
+    ctrl_i2c    m_i2c;
 };
