@@ -16,6 +16,11 @@
 #include "_common/gpio_button.h"
 
 
+#define ELOAD_DAC_MIN_VALUE     1300
+#define OVER_CURRENT_PROTECT     10 // [A], 0 means unlimited.
+
+
+
 #define GPIO_LED_R       7
 #define GPIO_LED_G       8
 #define GPIO_LED_B       9
@@ -24,7 +29,6 @@
 #define GPIO_ROTARY_B    3
 #define GPIO_ALERT       6
 
-#define OVER_CURRENT_PROTECT     10 // [A], 0 means unlimited.
 
 
 typedef enum MODE
@@ -59,7 +63,7 @@ i2c_mcp4726         g_iSupplyDac;
 int                 g_nSupplyDacOut = 0;
 PMoni_INA226        g_iLoadMon(1, 0);
 i2c_mcp4725         g_iLoadDac(1);
-int                 g_nLoadDacOut = 0;
+int                 g_nLoadDacOut = ELOAD_DAC_MIN_VALUE;
 
 
 GPIO_BUTTON_FUNC_DECLARE(GPIO_ROTARY_SW);
@@ -189,9 +193,15 @@ void  OnRotary( int dir )
         }
         else
         {
-          int R12 = 10000;
-          int R13 = 15000;
-          int stp = 100 * R13 / (R12 + R13); // 100mV
+          int Vref = 33;  // 3.3v
+          int target = 1; // target 0.1v step
+          int R7 = 50;
+          int R8 = 10000;
+          int R13 = 10; // kOhm
+          int R14 = 15; // kOhm
+//          int stp = 4095 * target / Vref * R14 / (R13+R14) * (R7+R8)/R8;
+          int stp = 2 * target * 4095 * R14 * (R7+R8) / (Vref * (R13+R14) * R8);
+          stp = (stp + 1) / 2;
 
           g_nSupplyDacOut += 0 < dir ? stp : - stp;
         }
@@ -205,6 +215,7 @@ void  OnRotary( int dir )
         else
         {
           int stp = 50;
+
           g_nLoadDacOut += 0 < dir ? stp : - stp;
         }
         break;
@@ -223,7 +234,7 @@ void  OnRotary( int dir )
     }
 
     g_nSupplyDacOut = 0 <= g_nSupplyDacOut ? g_nSupplyDacOut < 4096 ?  g_nSupplyDacOut : 4095 : 0;
-    g_nLoadDacOut = 0 <= g_nLoadDacOut ? g_nLoadDacOut < 4096 ?  g_nLoadDacOut : 4095 : 0;
+    g_nLoadDacOut = ELOAD_DAC_MIN_VALUE <= g_nLoadDacOut ? g_nLoadDacOut < 4096 ?  g_nLoadDacOut : 4095 : ELOAD_DAC_MIN_VALUE;
     g_isUpdateDac = 1;
     UpdateLED(g_nSupplyDacOut);
   }
@@ -243,7 +254,7 @@ void OnRotaryB()
 void OnAlert()
 {
   g_nSupplyDacOut = 0;
-  g_nLoadDacOut = 0;
+  g_nLoadDacOut = ELOAD_DAC_MIN_VALUE;
   g_isUpdateDac = 1;
 
   switch ( g_eCurrentMode )
@@ -311,7 +322,7 @@ void ChangeMode( MODE mode)
     default:
     case MODE_INIT:
       g_nSupplyDacOut = 0;
-      g_nLoadDacOut = 0;
+      g_nLoadDacOut = ELOAD_DAC_MIN_VALUE;
       UpdateLED(g_nSupplyDacOut);
       g_iSupplyDac.SetValue( g_nSupplyDacOut << 4 );
       g_iLoadDac.SetValue( g_nLoadDacOut << 4 );
@@ -328,7 +339,7 @@ void ChangeMode( MODE mode)
       g_iLoadMon.SetSamplingPeriod(33);
       g_iSupplyMon.SetSamplingPeriod(33);
       g_eCurrentMode = MODE_SUPPLY_ONLY_AUTO_DEC;
-      Serial.println( "***** POWER SUPPLY ONLY, ADTO DECREMENT MODE *****" );
+      Serial.println( "***** POWER SUPPLY ONLY - ADTO DECREMENT MODE *****" );
       break;
 
     case MODE_SUPPLY:
@@ -342,12 +353,12 @@ void ChangeMode( MODE mode)
       g_iLoadMon.SetSamplingPeriod(33);
       g_iSupplyMon.SetSamplingPeriod(33);
       g_eCurrentMode = MODE_SUPPLY_AUTO_DEC;
-      Serial.println( "***** POWER SUPPLY, ADTO DECREMENT MODE *****" );
+      Serial.println( "***** POWER SUPPLY - ADTO DECREMENT MODE *****" );
       break;
 
     case MODE_LOAD_AUTO_INC:
-      g_nLoadDacOut = 0;
-      g_iLoadDac.SetValue(0 );
+      g_nLoadDacOut = ELOAD_DAC_MIN_VALUE;
+      g_iLoadDac.SetValue( g_nLoadDacOut << 4 );
 
       g_iLoadMon.SetSamplingPeriod(500);
       delay(1000);
@@ -357,7 +368,7 @@ void ChangeMode( MODE mode)
         g_iLoadMon.SetSamplingPeriod(33);
         g_iSupplyMon.SetSamplingPeriod(33);
         g_eCurrentMode = MODE_LOAD_AUTO_INC;
-        Serial.println( "***** LOAD MODE, AUTO INCREMENT *****" );
+        Serial.println( "***** LOAD MODE - AUTO INCREMENT *****" );
         break;
       }
     /* Don't break */
@@ -434,8 +445,8 @@ void loop()
       if ( (loadV < g_dLoadAutoIncStopVal) ||
            ( 4 < loadA) )
       {
-        g_nLoadDacOut = 0;
-        g_iLoadDac.SetValue( 0 );
+        g_nLoadDacOut = ELOAD_DAC_MIN_VALUE;
+        g_iLoadDac.SetValue( g_nLoadDacOut << 4 );
         g_eNextMode = MODE_LOAD;
       }
       else
